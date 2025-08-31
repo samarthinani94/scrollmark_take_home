@@ -89,3 +89,9 @@ Provides crucial market context. Are competitors also seeing high demand in Cana
 
 **How to implement it:**
 This would require a data collection step, either through a social media API or a web scraper, to gather competitor comment data. Once collected, the data could be processed through our existing, modular pipeline to generate a comparative report.
+
+# AI & Tool Usage Disclosure
+
+While the overall project structure, analysis design, and workflow were independently planned and organized by me(Samarth), the majority of the codebase was written with the assistance of Google's Gemini AI. Gemini was used to generate, refactor, and optimize Python scripts, as well as to help with documentation and code comments. 
+
+All analytical decisions, data processing logic, and final outputs were reviewed and curated by me to ensure accuracy and relevance.
