@@ -1,37 +1,51 @@
-import pandas as pd
+import os
 
 class ReportGenerator:
     """
-    Generates a formatted text/markdown report from the analysis results.
+    Generates a final markdown report with all the analysis results.
     """
-    def __init__(self, output_path="report.md"):
-        self.output_path = output_path
-        self.report_content = "# Social Media Trend Analysis Report for @treehut\n\n"
+    def __init__(self, filename="report.md"):
+        self.filename = filename
+        self.content = ["# Tree Hut Instagram Comment Analysis Report"]
 
-    def add_section(self, title, content):
+    def add_section(self, title, text_content):
         """Adds a new section to the report."""
-        self.report_content += f"\n## {title}\n\n"
-        self.report_content += content
-        self.report_content += "\n"
+        self.content.append(f"\n## {title}\n")
+        self.content.append(text_content)
 
-    def add_list(self, title, data_list):
-        """Adds a formatted list to the report."""
-        content = ""
-        if not data_list:
-            content = "No data to display.\n"
+    def add_chart(self, title, chart_filename):
+        """Adds a chart to the report using Markdown image syntax."""
+        # Assumes charts are in the 'outputs' directory
+        chart_path = os.path.join('outputs', chart_filename)
+        self.add_section(title, f"![{title}]({chart_path})")
+
+    def add_ngrams(self, title, ngrams):
+        """Formats and adds a list of n-grams to the report."""
+        if not ngrams:
+            content = "No n-grams to display.\n"
         else:
-            for item, count in data_list:
-                content += f"- \"{item}\": {count}\n"
+            # Format n-gram tuples into readable strings
+            formatted_ngrams = [f"- `{' '.join(gram)}`: {count}" for gram, count in ngrams]
+            content = "\n".join(formatted_ngrams)
+        self.add_section(title, content)
+
+    def add_top_emojis(self, title, emojis):
+        """Formats and adds a list of top emojis."""
+        if not emojis:
+            content = "No emojis to display.\n"
+        else:
+            formatted_emojis = [f"- {emoji}: {count}" for emoji, count in emojis]
+            content = "\n".join(formatted_emojis)
         self.add_section(title, content)
         
     def add_topics(self, title, topics):
-        """Adds a formatted list for topics."""
-        content = ""
+        """Formats and adds a list of topics to the report."""
         if not topics:
-            content = "No topics discovered.\n"
+            content = "No topics were generated.\n"
         else:
-            for name, words in topics:
-                content += f"- **{name}**: {', '.join(words)}\n"
+            content = ""
+            for topic_name, words in topics:
+                content += f"**{topic_name}**: `{'`, `'.join(words)}`\n\n"
         self.add_section(title, content)
 
     def add_dataframe(self, title, df):
@@ -42,8 +56,17 @@ class ReportGenerator:
             content = df.to_markdown(index=False)
         self.add_section(title, content)
 
+    def add_emoji_sentiment_map(self, title, sentiment_map):
+        """Adds the emoji sentiment classification key to the report."""
+        content = ""
+        for sentiment, emojis in sentiment_map.items():
+            if emojis:
+                content += f"**{sentiment.capitalize()} Emojis**: {' '.join(emojis)}\n\n"
+        self.add_section(title, content)
+
     def generate_report(self):
-        """Writes the report content to the output file."""
-        with open(self.output_path, 'w') as f:
-            f.write(self.report_content)
-        print(f"Report successfully generated at: {self.output_path}")
+        """Writes the collected content to the markdown file."""
+        with open(self.filename, 'w', encoding='utf-8') as f:
+            f.write("\n".join(self.content))
+        print(f"\nReport generated: {self.filename}")
+

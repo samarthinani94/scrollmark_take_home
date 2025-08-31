@@ -1,88 +1,51 @@
 import pandas as pd
-import emoji
 from collections import Counter
+import demoji
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
 class EmojiAnalyzer:
     """
-    Handles all emoji extraction and sentiment analysis.
+    Analyzes emojis from a series of text comments.
     """
-    def __init__(self, df):
-        self.df = df.copy()
+    def __init__(self, text_series):
+        demoji.download_codes()
+        # Find all emojis across the entire series of comments using findall
+        all_emojis = []
+        for text in text_series.dropna():
+            all_emojis.extend(demoji.findall(text).keys())
+            
+        self.emojis = all_emojis
+        self.unique_emojis = sorted(list(set(all_emojis)))
         self.sentiment_analyzer = SentimentIntensityAnalyzer()
 
-    def get_top_n_emojis(self, n=25):
-        """Extracts and counts all emojis from the comment text."""
-        all_emojis = []
-        for text in self.df['comment_text'].dropna():
-            all_emojis.extend([e['emoji'] for e in emoji.emoji_list(text)])
-        return Counter(all_emojis).most_common(n)
+    def get_top_emojis(self, top_k=25):
+        """
+        Finds the most frequently used emojis.
+        """
+        return Counter(self.emojis).most_common(top_k)
 
-    def analyze_comment_sentiment(self):
+    def analyze_emoji_sentiments(self):
         """
-        Analyzes the sentiment of each comment and returns the breakdown.
+        Categorizes each unique emoji by its sentiment score.
         """
-        sentiments = self.df['comment_text'].dropna().apply(
-            lambda text: self.sentiment_analyzer.polarity_scores(text)['compound']
-        )
+        sentiments = {'positive': [], 'negative': [], 'neutral': []}
+        sentiment_map = {'positive': [], 'negative': [], 'neutral': []}
+
+        for emoji in self.unique_emojis:
+            score = self.sentiment_analyzer.polarity_scores(emoji)['compound']
+            # Correctly get the text description using findall
+            emoji_descriptions = demoji.findall(emoji)
+            demojized = emoji_descriptions.get(emoji, 'unknown') # Use .get for safety
+            
+            if score > 0.05:
+                sentiments['positive'].append(emoji)
+                sentiment_map['positive'].append(f"{emoji} (:{demojized}:)")
+            elif score < -0.05:
+                sentiments['negative'].append(emoji)
+                sentiment_map['negative'].append(f"{emoji} (:{demojized}:)")
+            else:
+                sentiments['neutral'].append(emoji)
+                sentiment_map['neutral'].append(f"{emoji} (:{demojized}:)")
         
-        breakdown = {
-            'Positive': (sentiments > 0.05).sum(),
-            'Neutral': ((sentiments >= -0.05) & (sentiments <= 0.05)).sum(),
-            'Negative': (sentiments < -0.05).sum()
-        }
-        return breakdown
-
-    def correlate_engagement_with_captions(self, caption_topics, caption_bigrams):
-        """
-        Creates tables correlating caption features (topics, bigrams) with engagement.
-        """
-        # --- Bigram Correlation ---
-        bigram_list = [gram for gram, count in caption_bigrams]
-        bigram_engagement_data = []
-
-        for bigram in bigram_list:
-            # Find all posts whose captions contain this bigram
-            relevant_posts = self.df[self.df['cleaned_caption'].str.contains(bigram, na=False)]
-            if not relevant_posts.empty:
-                comments_per_post = relevant_posts.groupby('media_id').size().mean()
-                
-                # Calculate positive sentiment for these posts
-                sentiments = relevant_posts['comment_text'].dropna().apply(lambda text: self.sentiment_analyzer.polarity_scores(text)['compound'])
-                positive_comments = (sentiments > 0.05).sum()
-                total_posts = relevant_posts['media_id'].nunique()
-                positive_per_post = positive_comments / total_posts if total_posts > 0 else 0
-                
-                bigram_engagement_data.append({
-                    "Caption Bigram": bigram,
-                    "Avg Comments/Post": round(comments_per_post, 2),
-                    "Avg Positive Comments/Post": round(positive_per_post, 2)
-                })
-
-        # --- Topic Correlation ---
-        topic_engagement_data = []
-        if caption_topics:
-            for name, words in caption_topics:
-                # Use the top word of the topic to find relevant posts
-                # A more advanced approach would use topic-per-document distributions
-                # but this is a fast and effective approximation.
-                primary_word = words[0]
-                relevant_posts = self.df[self.df['cleaned_caption'].str.contains(primary_word, na=False)]
-                if not relevant_posts.empty:
-                    comments_per_post = relevant_posts.groupby('media_id').size().mean()
-                    sentiments = relevant_posts['comment_text'].dropna().apply(lambda text: self.sentiment_analyzer.polarity_scores(text)['compound'])
-                    positive_comments = (sentiments > 0.05).sum()
-                    total_posts = relevant_posts['media_id'].nunique()
-                    positive_per_post = positive_comments / total_posts if total_posts > 0 else 0
-
-                    topic_engagement_data.append({
-                        "Caption Topic": name,
-                        "Avg Comments/Post": round(comments_per_post, 2),
-                        "Avg Positive Comments/Post": round(positive_per_post, 2)
-                    })
-
-        return {
-            "bigrams": pd.DataFrame(bigram_engagement_data),
-            "topics": pd.DataFrame(topic_engagement_data)
-        }
+        return sentiments, sentiment_map
 
